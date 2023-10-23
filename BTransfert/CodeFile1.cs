@@ -1,5 +1,4 @@
 ﻿public struct VarGlobalAPP
 {
-    public static int Port;
-    public static bool ChangePort=false;
+    public static int Port=12345;
 }

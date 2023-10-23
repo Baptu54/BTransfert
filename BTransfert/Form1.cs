@@ -1,29 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-using System.Net.NetworkInformation;
 using System.Security.Principal;
-using System.Collections.Specialized;
-using System.Diagnostics;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace BTransfert
 {
     public partial class Form1 : Form
     {
-        private int Port=VarGlobalAPP.Port;
+        private int Port = VarGlobalAPP.Port;
         string tempDirectory;
-        
+        bool reponse = false;
+
         public Form1()
         {
             InitializeComponent();
@@ -31,14 +27,15 @@ namespace BTransfert
 
         private async void Form1_Load(object sender, EventArgs e)
         {
-            
-            label2.Text = "Port : " +Port;
-            label1.Text = GetUserName() + "     " + GetLocalIPAddress();
+            textBox1.Text = "Adresse IP";
+            textBox1.ForeColor = SystemColors.GrayText;
+            textBox2.Text = "Chemin Fichier";
+            textBox2.ForeColor = SystemColors.GrayText;
+            label2.Text = "Port : " + Port;
+            label3.Text = "Utilisateur : "+GetUserName();
+            label1.Text = "Adresse IP : " + GetLocalIPAddress();
             tempDirectory = Path.Combine(Path.GetTempPath(), "btransfert");
-            if (!Directory.Exists(tempDirectory))
-            {
-                Directory.CreateDirectory(tempDirectory);
-            }
+            
             await Task.Run(() => EcouteReseau());
 
         }
@@ -83,19 +80,24 @@ namespace BTransfert
                     string ipsrc = tabfilmip[1];
                     string usr = tabfilmip[2];
                     ListViewItem listViewItem1 = new ListViewItem(new string[] { ipsrc, usr });
+                    
                     listView2.Items.Add(listViewItem1);
-                    if (fileName== "Requette_Btransfert")
+                    if (fileName == "Requette_Btransfert")
                     {
-                        
-                        await Task.Run(() => Reponse(ipsrc));
-                        
+
+                        await Task.Run(() => Message(ipsrc, "Reponse_Btransfert", null));
+
                     }
                     else if (fileName == "Reponse_Btransfert")
                     {
                         
                     }
+                    else if (fileName == "Reponse_Reception")
+                    {
+                        reponse = true;
+                    }
                     else
-                    {                                                
+                    {
                         string tempFilePath = Path.Combine(tempDirectory, fileName);
                         if (!File.Exists(tempFilePath))
                         {
@@ -109,6 +111,17 @@ namespace BTransfert
                             }
                             ListViewItem listViewItem = new ListViewItem(new string[] { fileName, (Convert.ToDouble(new FileInfo(tempFilePath).Length) / 1000).ToString("F1") + " Ko", DateTime.Now.ToString(), usr, ipsrc });
                             listView1.Items.Add(listViewItem);
+                            FlashWindow();
+                            try
+                            {
+                                await Task.Run(() => Message(ipsrc,"Reponse_Reception", null));
+                            }
+                            catch (Exception)
+                            {
+
+                         
+                            }
+                            
                         }
                     }
 
@@ -120,7 +133,7 @@ namespace BTransfert
                 MessageBox.Show("Erreur : " + ex.Message);
             }
         }
-        private async Task Reponse(string ip)
+        private async Task Message(string ip,string type,string message)
         {
             try
             {
@@ -130,7 +143,7 @@ namespace BTransfert
 
                     using (NetworkStream stream = client.GetStream())
                     {
-                        byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes("Reponse_Btransfert" + ";" + GetLocalIPAddress() + ";" + GetUserName());
+                        byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(type + ";" + GetLocalIPAddress() + ";" + GetUserName()+";"+ message);
                         int fileNameSize = fileNameBytes.Length;
                         byte[] fileNameSizeBytes = BitConverter.GetBytes(fileNameSize);
                         await stream.WriteAsync(fileNameSizeBytes, 0, fileNameSizeBytes.Length);
@@ -141,12 +154,13 @@ namespace BTransfert
             catch (Exception ex)
             {
                 // Gérer les erreurs ici
-                MessageBox.Show("Erreur lors de l'envoi du fichier : " + ex.Message);
+                MessageBox.Show("Erreur lors de l'envoi du mesage : " + ex.Message);
             }
         }
 
         private async void button1_Click(object sender, EventArgs e)  // envoi fichier
         {
+            button1.Enabled = false;
             string ipAddress = textBox1.Text;
 
             try
@@ -174,16 +188,35 @@ namespace BTransfert
                             }
                         }
                     }
+
+                    int compt=0 ;
+                    while (reponse==false)
+                    {
+                        await Task.Delay(1000);
+                        compt++;
+                        if (compt> Convert.ToInt32(new FileInfo(textBox2.Text).Length / 1000)+5)
+                        {                            
+                            reponse = true;
+                            DialogResult resulta = MessageBox.Show("Le recepteur n'a peut etre pas reçu votre fichier", "Time Out", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            button1.Enabled = true;
+                            reponse = false;
+                            return;
+                        }
+                    }
+                    button1.Enabled = true;
+                    reponse = false;                   
+                    DialogResult result = MessageBox.Show("Votre message a bien été reçu", "Envoi Reussi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
                 // Gérer les erreurs ici
                 MessageBox.Show("Erreur lors de l'envoi du fichier : " + ex.Message);
+                button1.Enabled = true;
             }
         }
 
-       
+
 
         private void button2_Click(object sender, EventArgs e)
         {
@@ -198,7 +231,7 @@ namespace BTransfert
                 {
                     //Get the path of specified file
                     filePath = openFileDialog.FileName;
-                }                
+                }
             }
             textBox2.Text = filePath;
         }
@@ -251,41 +284,45 @@ namespace BTransfert
             string ipAddress = GetLocalIPAddress();
             string[] ipParts = ipAddress.Split('.');
             string baseIp = ipParts[0] + "." + ipParts[1] + "." + ipParts[2] + ".";
-            List<Task<bool>> tasks = new List<Task<bool>>();
-            //var tasks = new Task<bool>[254];
+            //List<Task<bool>> tasks = new List<Task<bool>>();
+            var taskss = new Task<bool>[254];
             for (int i = 1; i <= 254; i++)
             {
                 string targetIp = baseIp + i;
-                //tasks[i-1] = TestConnectivityAsync(targetIp, Port);
-                var task = TestConnectivityAsync(targetIp, Port);
-                var timeoutTask = Task.Delay(10); // Délai maximum de 1 seconde
-
-                // Utilisez Task.WhenAny pour attendre la tâche ou le délai maximum
-                var completedTask = await Task.WhenAny(task, timeoutTask);
-
-                if (completedTask == task)
-                {
-                    // La tâche a réussi
-                    bool result = await task;                    
-                }
-                else
-                {
-                    // La tâche a pris trop de temps
-                    
-                }
+                taskss[i-1] = Taches(targetIp, Port);
+                
             }
-            //bool[] results = await Task.WhenAll(tasks);
+            bool[] results = await Task.WhenAll(taskss);
             button3.Enabled = true;
             button1.Enabled = true;
         }
+        public async Task<bool> Taches(string ipAddress, int port)
+        {
+            var task = TestConnectivityAsync(ipAddress, port);
+            var timeoutTask = Task.Delay(1000); // Délai maximum de 1 seconde
 
+            // Utilisez Task.WhenAny pour attendre la tâche ou le délai maximum
+            var completedTask = await Task.WhenAny(task, timeoutTask);
+
+            if (completedTask == task)
+            {
+                // La tâche a réussi
+                bool result = await task;
+                return result;
+            }
+            else
+            {
+                // La tâche a pris trop de temps
+                return false;
+            }
+        }
 
         public async Task<bool> TestConnectivityAsync(string ipAddress, int port)
         {
 
             using (TcpClient client = new TcpClient())
             {
-                if(ipAddress!= GetLocalIPAddress())
+                if (ipAddress != GetLocalIPAddress())
                 {
                     try
                     {
@@ -304,7 +341,7 @@ namespace BTransfert
                     }
                     catch (Exception)
                     {
-                        return false; 
+                        return false;
                     }
                 }
                 return false;
@@ -314,7 +351,7 @@ namespace BTransfert
         private void button4_Click(object sender, EventArgs e)
         {
             string nom = $"Screenshot_{DateTime.Now:yyyyMMddHHmmss}.png";
-            string Directory = Path.Combine(tempDirectory,nom);
+            string Directory = Path.Combine(tempDirectory, nom);
             try
             {
                 if (Clipboard.ContainsImage())
@@ -323,8 +360,23 @@ namespace BTransfert
 
                     if (clipboardImage != null)
                     {
-                        clipboardImage.Save(Directory); 
+                        clipboardImage.Save(Directory);
                         textBox2.Text = Directory;
+                    }
+                }
+                if (Clipboard.ContainsFileDropList())
+                {
+                    var fileDropList = Clipboard.GetFileDropList();
+                    if (fileDropList.Count > 0)
+                    {
+                        string firstFilePath = fileDropList[0];                        
+                        string targetPath = Path.Combine(tempDirectory, Path.GetFileName(firstFilePath));
+                        File.Copy(firstFilePath, targetPath);
+                        textBox2.Text = targetPath;
+                    }
+                    else
+                    {
+                       
                     }
                 }
                 else
@@ -337,7 +389,7 @@ namespace BTransfert
 
                 MessageBox.Show("Erreur : " + ex.Message);
             }
-            
+
         }
         private void listView1_ItemActivate(object sender, EventArgs e)
         {
@@ -345,26 +397,27 @@ namespace BTransfert
 
         private void listView2_ItemActivate(object sender, EventArgs e)                         //METTRE IP SELECTIONE DANS TEXTBOX
         {
-            textBox1.Text= listView2.SelectedItems[0].SubItems[0].Text;
+            textBox1.Text = listView2.SelectedItems[0].SubItems[0].Text;
         }
         string fichselect;
         private void listView1_ItemSelectionChanged(object sender, ListViewItemSelectionChangedEventArgs e)                         //DETECTION CHANGEMENT SELECTION LISTVIEW
         {
-            try
+            if (e.IsSelected)
             {
-                fichselect=listView1.SelectedItems[0].SubItems[0].Text;
-                button5.Enabled = true;button6.Enabled = true;button7.Enabled = true;
+                fichselect = listView1.SelectedItems[0].SubItems[0].Text;
+                button5.Enabled = true; button6.Enabled = true; button7.Enabled = true;
+                e.Item.ForeColor = SystemColors.GrayText;
             }
-            catch (Exception)
+            else
             {
                 fichselect = null;
                 button5.Enabled = false; button6.Enabled = false; ; button7.Enabled = false;
             }
-            
+
         }
         private void button5_Click(object sender, EventArgs e)                                  //COPIER LE FICHIER
         {
-            if (fichselect!=null)
+            if (fichselect != null)
             {
                 string filePath = Path.Combine(tempDirectory, fichselect);
                 StringCollection fileCollection = new StringCollection();
@@ -390,14 +443,14 @@ namespace BTransfert
                     try
                     {
                         System.IO.File.Copy(Path.Combine(tempDirectory, fichselect), destinationFilePath);
-                        Console.WriteLine("Fichier enregistré sous : " + destinationFilePath);
+                        
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Une erreur est survenue lors de l'enregistrement du fichier : " + ex.Message);
+                        
                     }
                 }
-            }                 
+            }
         }
 
         private void button7_Click(object sender, EventArgs e)
@@ -407,13 +460,83 @@ namespace BTransfert
                 string filePath = Path.Combine(tempDirectory, fichselect);
                 Process.Start(filePath);
             }
-            
+
+        }
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct FLASHWINFO
+        {
+            public uint cbSize;
+            public IntPtr hwnd;
+            public uint dwFlags;
+            public uint uCount;
+            public uint dwTimeout;
+        }
+        private void FlashWindow()
+        {
+            FLASHWINFO fw = new FLASHWINFO();
+            fw.cbSize = Convert.ToUInt32(Marshal.SizeOf(typeof(FLASHWINFO)));
+            fw.hwnd = this.Handle;
+            fw.dwFlags = 0x00000003 | 0x0000000C; // Flash both the window and the taskbar button
+            fw.uCount = uint.MaxValue; // Keep flashing until the window comes to the foreground
+            fw.dwTimeout = 0;
+            FlashWindowEx(ref fw);
+        }
+        private void Form1_Activated(object sender, EventArgs e)
+        { 
         }
 
-        private void button8_Click(object sender, EventArgs e)
-        {            
-            VarGlobalAPP.ChangePort = true;
-            this.Close();
+        private void Form1_Enter(object sender, EventArgs e)
+        {
+        }
+
+        private void textBox1_Enter(object sender, EventArgs e)
+        {
+            if (textBox1.Text == "Adresse IP")
+            {
+                textBox1.Text = "";
+                textBox1.ForeColor = SystemColors.WindowText;
+            }
+        }
+
+        private void textBox1_Leave(object sender, EventArgs e)
+        {
+            if (textBox1.Text.Length == 0)
+            {
+                textBox1.Text = "Adresse IP";
+                textBox1.ForeColor = SystemColors.GrayText;
+            }
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            textBox1.ForeColor = SystemColors.WindowText;
+        }
+
+        private void textBox2_TextChanged(object sender, EventArgs e)
+        {
+            textBox2.ForeColor = SystemColors.WindowText;
+        }
+
+        private void textBox2_Enter(object sender, EventArgs e)
+        {
+            if (textBox2.Text == "Chemin Fichier")
+            {
+                textBox2.Text = "";
+                textBox2.ForeColor = SystemColors.WindowText;
+            }
+        }
+
+        private void textBox2_Leave(object sender, EventArgs e)
+        {
+            if (textBox2.Text.Length == 0)
+            {                
+                textBox2.Text = "Chemin Fichier";
+                textBox2.ForeColor = SystemColors.GrayText;
+            }
         }
     }
 }
