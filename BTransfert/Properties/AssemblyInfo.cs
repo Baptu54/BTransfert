@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("BTransfert")]
 [assembly: AssemblyDescription("Application de transfert de fichier en réseau local")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Brackez")]
+[assembly: AssemblyCompany("BaptV")]
 [assembly: AssemblyProduct("BTransfert")]
 [assembly: AssemblyCopyright("Copyright ©  2023")]
 [assembly: AssemblyTrademark("")]
@@ -31,5 +31,5 @@ using System.Runtime.InteropServices;
 // Vous pouvez spécifier toutes les valeurs ou indiquer les numéros de build et de révision par défaut
 // en utilisant '*', comme indiqué ci-dessous :
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.3.0")]
+[assembly: AssemblyVersion("1.0.4.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]

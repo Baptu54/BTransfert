@@ -11,15 +11,19 @@ namespace BTransfert
         public Form2()
         {
             InitializeComponent();
+            this.MaximizeBox = false;
         }
 
         private void Form2_Load(object sender, EventArgs e)
-        {            
+        {
+            CenterToScreen();
+            BringToFront();
             Assembly assembly = Assembly.GetExecutingAssembly(); // Obtenir l'assembly en cours d'exécution
             Version version = assembly.GetName().Version;
             label1.Text = "Version : " + version;
             try
             {
+                AutoUpdater.RunUpdateAsAdmin = true;
                 AutoUpdater.Mandatory = true;
                 AutoUpdater.Start("https://github.com/Baptu54/BTransfert/raw/master/aaaa.xml");
             }
